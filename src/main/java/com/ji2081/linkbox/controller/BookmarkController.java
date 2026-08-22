@@ -1,14 +1,16 @@
 package com.ji2081.linkbox.controller;
 
+import com.ji2081.linkbox.domain.ReadStatus;
 import com.ji2081.linkbox.dto.BookmarkCreateRequest;
 import com.ji2081.linkbox.dto.BookmarkResponse;
 import com.ji2081.linkbox.service.BookmarkService;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/bookmarks")   // 이 클래스의 모든 주소 앞에 /bookmarks 가 붙음
+@RequestMapping("/bookmarks")
 public class BookmarkController {
 
     private final BookmarkService bookmarkService;
@@ -17,13 +19,33 @@ public class BookmarkController {
         this.bookmarkService = bookmarkService;
     }
 
-    @PostMapping   // POST /bookmarks
+    @PostMapping
     public BookmarkResponse create(@RequestBody BookmarkCreateRequest request) {
         return bookmarkService.save(request);
     }
 
-    @GetMapping    // GET /bookmarks
-    public List<BookmarkResponse> findAll() {
-        return bookmarkService.findAll();
+    // GET /bookmarks?category=여행&status=TODO  (둘 다 생략 가능)
+    @GetMapping
+    public List<BookmarkResponse> findAll(
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) ReadStatus status
+    ) {
+        return bookmarkService.findAll(category, status);
+    }
+
+    @PatchMapping("/{id}/done")
+    public BookmarkResponse markAsDone(@PathVariable Long id) {
+        return bookmarkService.markAsDone(id);
+    }
+
+    @PatchMapping("/{id}/todo")
+    public BookmarkResponse markAsTodo(@PathVariable Long id) {
+        return bookmarkService.markAsTodo(id);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)   // 성공했지만 돌려줄 내용 없음 (204)
+    public void delete(@PathVariable Long id) {
+        bookmarkService.delete(id);
     }
 }

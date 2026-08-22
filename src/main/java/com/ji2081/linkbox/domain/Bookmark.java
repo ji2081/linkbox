@@ -10,7 +10,7 @@ public class Bookmark {
     @GeneratedValue(strategy = GenerationType.IDENTITY) // 번호는 DB가 매김
     private Long id;
 
-    @Column(nullable = false, length = 500)
+    @Column(nullable = false, length = 500, unique = true)
     private String url;
 
     @Column(nullable = false)

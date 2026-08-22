@@ -28,4 +28,10 @@ public class GlobalExceptionHandler {
         }
         return new ErrorResponse("INVALID_INPUT", String.join(", ", messages));
     }
+
+    @ExceptionHandler(DuplicateUrlException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)   // 409
+    public ErrorResponse handleDuplicate(DuplicateUrlException e) {
+        return new ErrorResponse("DUPLICATE_URL", e.getMessage());
+    }
 }

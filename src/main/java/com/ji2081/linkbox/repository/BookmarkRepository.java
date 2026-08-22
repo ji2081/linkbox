@@ -14,6 +14,8 @@ public interface BookmarkRepository extends JpaRepository<Bookmark, Long> {
     // 메서드 이름만으로 쿼리 생성 → WHERE url = ?
     Optional<Bookmark> findByUrl(String url);
 
+    boolean existsByUrl(String url);
+
     List<Bookmark> findByCategory(String category);
 
     List<Bookmark> findByStatus(ReadStatus status);

@@ -8,12 +8,19 @@ import com.ji2081.linkbox.repository.BookmarkRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.ji2081.linkbox.exception.BookmarkNotFoundException;
+import com.ji2081.linkbox.exception.DuplicateUrlException;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Service
 public class BookmarkService {
+
+    // 링크 본질과 무관한 추적용 파라미터들
+    private static final List<String> TRACKING_PARAMS = List.of(
+            "si", "igsh", "fbclid", "gclid",
+            "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"
+    );
 
     private final BookmarkRepository bookmarkRepository;
 
@@ -22,14 +29,19 @@ public class BookmarkService {
     }
 
     public BookmarkResponse save(BookmarkCreateRequest request) {
+        String url = normalizeUrl(request.url());
+
+        if (bookmarkRepository.existsByUrl(url)) {
+            throw new DuplicateUrlException(url);
+        }
+
         Bookmark bookmark = new Bookmark(
-                request.url(),
+                url,
                 request.title(),
                 request.category(),
                 request.memo()
         );
-        Bookmark saved = bookmarkRepository.save(bookmark);
-        return BookmarkResponse.from(saved);
+        return BookmarkResponse.from(bookmarkRepository.save(bookmark));
     }
 
     // category, status 둘 다 없으면 전체 조회
@@ -81,4 +93,42 @@ public class BookmarkService {
         }
         return result;
     }
+
+    // 같은 링크를 같은 문자열로 통일
+    private String normalizeUrl(String rawUrl) {
+        String url = rawUrl.trim();
+
+        int queryIndex = url.indexOf('?');
+        if (queryIndex == -1) {
+            return removeTrailingSlash(url);
+        }
+
+        String base = removeTrailingSlash(url.substring(0, queryIndex));
+        String query = url.substring(queryIndex + 1);
+
+        // 추적용 파라미터만 버리고 나머지는 살림
+        List<String> kept = new ArrayList<>();
+        for (String param : query.split("&")) {
+            if (param.isEmpty()) {
+                continue;
+            }
+            String key = param.split("=")[0];
+            if (!TRACKING_PARAMS.contains(key)) {
+                kept.add(param);
+            }
+        }
+
+        if (kept.isEmpty()) {
+            return base;
+        }
+        return base + "?" + String.join("&", kept);
+    }
+
+    private String removeTrailingSlash(String url) {
+        if (url.endsWith("/")) {
+            return url.substring(0, url.length() - 1);
+        }
+        return url;
+    }
+
 }

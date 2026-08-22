@@ -13,7 +13,7 @@ public class Bookmark {
     @Column(nullable = false, length = 500, unique = true)
     private String url;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 500)
     private String title;
 
     private String category;

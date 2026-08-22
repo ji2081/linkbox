@@ -1,27 +1,28 @@
 package com.ji2081.linkbox.service;
 
+import com.ji2081.linkbox.client.LinkTitleFetcher;
 import com.ji2081.linkbox.domain.Bookmark;
 import com.ji2081.linkbox.domain.ReadStatus;
 import com.ji2081.linkbox.dto.BookmarkCreateRequest;
 import com.ji2081.linkbox.dto.BookmarkResponse;
+import com.ji2081.linkbox.exception.BookmarkNotFoundException;
+import com.ji2081.linkbox.exception.DuplicateUrlException;
+import com.ji2081.linkbox.exception.NoBookmarkToReadException;
 import com.ji2081.linkbox.repository.BookmarkRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.ji2081.linkbox.exception.BookmarkNotFoundException;
-import com.ji2081.linkbox.exception.DuplicateUrlException;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-
 import java.util.Map;
-
-import com.ji2081.linkbox.exception.NoBookmarkToReadException;
-import java.time.LocalDate;
 
 @Service
 public class BookmarkService {
 
-    // 링크 본질과 무관한 추적용 파라미터들
+    private static final int MAX_TITLE_LENGTH = 500;
+
+    // 링크 본질과 무관한 추적용 파라미터
     private static final List<String> TRACKING_PARAMS = List.of(
             "si", "igsh", "fbclid", "gclid",
             "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"
@@ -40,9 +41,12 @@ public class BookmarkService {
     );
 
     private final BookmarkRepository bookmarkRepository;
+    private final LinkTitleFetcher linkTitleFetcher;
 
-    public BookmarkService(BookmarkRepository bookmarkRepository) {
+    public BookmarkService(BookmarkRepository bookmarkRepository,
+                           LinkTitleFetcher linkTitleFetcher) {
         this.bookmarkRepository = bookmarkRepository;
+        this.linkTitleFetcher = linkTitleFetcher;
     }
 
     public BookmarkResponse save(BookmarkCreateRequest request) {
@@ -54,7 +58,7 @@ public class BookmarkService {
 
         Bookmark bookmark = new Bookmark(
                 url,
-                request.title(),
+                resolveTitle(request.title(), url),
                 resolveCategory(request.category(), url),
                 request.memo()
         );
@@ -76,6 +80,23 @@ public class BookmarkService {
         }
 
         return toResponses(bookmarks);
+    }
+
+    // 안 본 것 중 가장 오래 묵은 것 하나만
+    public BookmarkResponse findTodayPick() {
+        Bookmark bookmark = bookmarkRepository
+                .findFirstByStatusOrderBySavedAtAsc(ReadStatus.TODO)
+                .orElseThrow(() -> new NoBookmarkToReadException());
+
+        return BookmarkResponse.from(bookmark);
+    }
+
+    // 저장한 지 days일 이상 지났는데 아직 안 본 것들
+    public List<BookmarkResponse> findRotten(int days) {
+        LocalDate threshold = LocalDate.now().minusDays(days);
+        return toResponses(
+                bookmarkRepository.findByStatusAndSavedAtLessThanEqual(ReadStatus.TODO, threshold)
+        );
     }
 
     @Transactional
@@ -103,12 +124,28 @@ public class BookmarkService {
                 .orElseThrow(() -> new BookmarkNotFoundException(id));
     }
 
-    private List<BookmarkResponse> toResponses(List<Bookmark> bookmarks) {
-        List<BookmarkResponse> result = new ArrayList<>();
-        for (Bookmark bookmark : bookmarks) {
-            result.add(BookmarkResponse.from(bookmark));
+    // 제목: 직접 준 것 > 링크에서 추출 > URL
+    private String resolveTitle(String title, String url) {
+        if (title != null && !title.isBlank()) {
+            return title;
         }
-        return result;
+        String fetched = linkTitleFetcher.fetchTitle(url).orElse(url);
+        return truncate(fetched, MAX_TITLE_LENGTH);
+    }
+
+    // 카테고리: 직접 준 것 > 도메인으로 추측 > 기타
+    private String resolveCategory(String category, String url) {
+        if (category != null && !category.isBlank()) {
+            return category;
+        }
+
+        for (Map.Entry<String, String> entry : DOMAIN_CATEGORY.entrySet()) {
+            if (url.contains(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
+
+        return "기타";
     }
 
     // 같은 링크를 같은 문자열로 통일
@@ -148,36 +185,18 @@ public class BookmarkService {
         return url;
     }
 
-    // 카테고리를 안 줬으면 URL 보고 추측
-    private String resolveCategory(String category, String url) {
-        if (category != null && !category.isBlank()) {
-            return category;   // 직접 준 게 있으면 그걸 존중
+    private String truncate(String value, int maxLength) {
+        if (value.length() <= maxLength) {
+            return value;
         }
+        return value.substring(0, maxLength);
+    }
 
-        for (Map.Entry<String, String> entry : DOMAIN_CATEGORY.entrySet()) {
-            if (url.contains(entry.getKey())) {
-                return entry.getValue();
-            }
+    private List<BookmarkResponse> toResponses(List<Bookmark> bookmarks) {
+        List<BookmarkResponse> result = new ArrayList<>();
+        for (Bookmark bookmark : bookmarks) {
+            result.add(BookmarkResponse.from(bookmark));
         }
-
-        return "기타";
+        return result;
     }
-
-    // 안 본 것 중 가장 오래 묵은 것 하나만
-    public BookmarkResponse findTodayPick() {
-        Bookmark bookmark = bookmarkRepository
-                .findFirstByStatusOrderBySavedAtAsc(ReadStatus.TODO)
-                .orElseThrow(() -> new NoBookmarkToReadException());
-
-        return BookmarkResponse.from(bookmark);
-    }
-
-    // 저장한 지 days일 이상 지났는데 아직 안 본 것들
-    public List<BookmarkResponse> findRotten(int days) {
-        LocalDate threshold = LocalDate.now().minusDays(days);
-        return toResponses(
-                bookmarkRepository.findByStatusAndSavedAtLessThanEqual(ReadStatus.TODO, threshold)
-        );
-    }
-
 }

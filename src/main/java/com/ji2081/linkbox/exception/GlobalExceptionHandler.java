@@ -34,4 +34,10 @@ public class GlobalExceptionHandler {
     public ErrorResponse handleDuplicate(DuplicateUrlException e) {
         return new ErrorResponse("DUPLICATE_URL", e.getMessage());
     }
+
+    @ExceptionHandler(NoBookmarkToReadException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleNoBookmarkToRead(NoBookmarkToReadException e) {
+        return new ErrorResponse("NO_BOOKMARK_TO_READ", e.getMessage());
+    }
 }

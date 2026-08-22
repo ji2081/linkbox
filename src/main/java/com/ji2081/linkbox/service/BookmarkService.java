@@ -13,6 +13,11 @@ import com.ji2081.linkbox.exception.DuplicateUrlException;
 import java.util.ArrayList;
 import java.util.List;
 
+import java.util.Map;
+
+import com.ji2081.linkbox.exception.NoBookmarkToReadException;
+import java.time.LocalDate;
+
 @Service
 public class BookmarkService {
 
@@ -20,6 +25,18 @@ public class BookmarkService {
     private static final List<String> TRACKING_PARAMS = List.of(
             "si", "igsh", "fbclid", "gclid",
             "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"
+    );
+
+    // URL에 이 문자열이 들어있으면 해당 카테고리로 추측
+    private static final Map<String, String> DOMAIN_CATEGORY = Map.of(
+            "youtube.com", "영상",
+            "youtu.be", "영상",
+            "github.com", "개발",
+            "velog.io", "개발",
+            "tistory.com", "블로그",
+            "blog.naver.com", "블로그",
+            "instagram.com", "인스타",
+            "brunch.co.kr", "글"
     );
 
     private final BookmarkRepository bookmarkRepository;
@@ -38,7 +55,7 @@ public class BookmarkService {
         Bookmark bookmark = new Bookmark(
                 url,
                 request.title(),
-                request.category(),
+                resolveCategory(request.category(), url),
                 request.memo()
         );
         return BookmarkResponse.from(bookmarkRepository.save(bookmark));
@@ -129,6 +146,38 @@ public class BookmarkService {
             return url.substring(0, url.length() - 1);
         }
         return url;
+    }
+
+    // 카테고리를 안 줬으면 URL 보고 추측
+    private String resolveCategory(String category, String url) {
+        if (category != null && !category.isBlank()) {
+            return category;   // 직접 준 게 있으면 그걸 존중
+        }
+
+        for (Map.Entry<String, String> entry : DOMAIN_CATEGORY.entrySet()) {
+            if (url.contains(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
+
+        return "기타";
+    }
+
+    // 안 본 것 중 가장 오래 묵은 것 하나만
+    public BookmarkResponse findTodayPick() {
+        Bookmark bookmark = bookmarkRepository
+                .findFirstByStatusOrderBySavedAtAsc(ReadStatus.TODO)
+                .orElseThrow(() -> new NoBookmarkToReadException());
+
+        return BookmarkResponse.from(bookmark);
+    }
+
+    // 저장한 지 days일 이상 지났는데 아직 안 본 것들
+    public List<BookmarkResponse> findRotten(int days) {
+        LocalDate threshold = LocalDate.now().minusDays(days);
+        return toResponses(
+                bookmarkRepository.findByStatusAndSavedAtLessThanEqual(ReadStatus.TODO, threshold)
+        );
     }
 
 }

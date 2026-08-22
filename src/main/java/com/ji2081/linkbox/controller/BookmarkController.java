@@ -49,4 +49,17 @@ public class BookmarkController {
     public void delete(@PathVariable Long id) {
         bookmarkService.delete(id);
     }
+
+    // GET /bookmarks/today
+    @GetMapping("/today")
+    public BookmarkResponse findTodayPick() {
+        return bookmarkService.findTodayPick();
+    }
+
+    // GET /bookmarks/rotten?days=30
+    @GetMapping("/rotten")
+    public List<BookmarkResponse> findRotten(@RequestParam(defaultValue = "30") int days) {
+        return bookmarkService.findRotten(days);
+    }
+
 }

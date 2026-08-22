@@ -6,6 +6,7 @@ import com.ji2081.linkbox.dto.BookmarkResponse;
 import com.ji2081.linkbox.service.BookmarkService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.List;
 
@@ -20,7 +21,7 @@ public class BookmarkController {
     }
 
     @PostMapping
-    public BookmarkResponse create(@RequestBody BookmarkCreateRequest request) {
+    public BookmarkResponse create(@Valid @RequestBody BookmarkCreateRequest request) {
         return bookmarkService.save(request);
     }
 

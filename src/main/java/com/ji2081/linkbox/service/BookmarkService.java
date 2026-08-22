@@ -7,6 +7,7 @@ import com.ji2081.linkbox.dto.BookmarkResponse;
 import com.ji2081.linkbox.repository.BookmarkRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.ji2081.linkbox.exception.BookmarkNotFoundException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -70,7 +71,7 @@ public class BookmarkService {
 
     private Bookmark findOrThrow(Long id) {
         return bookmarkRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("북마크를 찾을 수 없습니다. id=" + id));
+                .orElseThrow(() -> new BookmarkNotFoundException(id));
     }
 
     private List<BookmarkResponse> toResponses(List<Bookmark> bookmarks) {
